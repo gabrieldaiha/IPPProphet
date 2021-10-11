@@ -85,20 +85,23 @@ functions {
 }
 
 data {
-  int T;                // Number of time periods
-  int<lower=1> K;       // Number of regressors
-  vector[T] t;          // Time
-  vector[T] cap;        // Capacities for logistic trend
-  vector[T] y;          // Time series
-  int S;                // Number of changepoints
-  vector[S] t_change;   // Times of trend changepoints
-  matrix[T,K] X;        // Regressors
-  vector[K] sigmas;     // Scale on seasonality prior
-  real<lower=0> tau;    // Scale on changepoints prior
-  int trend_indicator;  // 0 for linear, 1 for logistic, 2 for flat
-  vector[K] s_a;        // Indicator of additive features
-  vector[K] s_m;        // Indicator of multiplicative features
-}
+  int T;                                               // Number of time periods
+  int<lower=1> K;                                      // Number of regressors
+  vector[T] t;                                         // Time
+  vector[T] cap;                                       // Capacities for logistic trend
+  vector[T] y;                                         // Time series
+  int S;                                               // Number of changepoints
+  vector[S] t_change;                                  // Times of trend changepoints
+  real<lower=0> tau;                                   // Scale on changepoints prior
+  int trend_indicator;                                 // 0 for linear, 1 for logistic
+  matrix[T,K] X;                                       // Regressors
+  vector[K] sigmas;                                    // Scale on seasonality prior
+  vector[K] s_a;                                       // Indicator of additive features
+  vector[K] s_m;                                       // Indicator of multiplicative features
+  vector[K] pos_const;                                 // Indicator of positive constrained feature
+  vector[K] neg_const;                                 // Indicator of negative constrained feature
+  vector[K] unconst;                                   // Indicator of unconstrained feature
+  }
 
 transformed data {
   matrix[T, S] A;
@@ -106,11 +109,13 @@ transformed data {
 }
 
 parameters {
-  real k;                   // Base trend growth rate
-  real m;                   // Trend offset
-  vector[S] delta;          // Trend rate adjustments
-  real<lower=0> sigma_obs;  // Observation noise
-  vector[K] beta;           // Regressor coefficients
+  real k;                                             // Base trend growth rate
+  real m;                                             // Trend offset
+  vector[S] delta;                                    // Trend rate adjustments
+  real<lower=0> sigma_obs;                            // Observation noise
+  vector<lower=0>[K] beta_pos_const;                  // Beta for positive constrained features
+  vector<upper=0>[K] beta_neg_const;                  // Beta for negative constrained features
+  vector[K] beta_unconst;                             // Beta for unconstrained features
 }
 
 transformed parameters {
@@ -121,7 +126,7 @@ transformed parameters {
     trend = logistic_trend(k, m, delta, t, cap, A, t_change, S);
   } else if (trend_indicator == 2) {
     trend = flat_trend(m, T);
-  }
+  };
 }
 
 model {
@@ -130,13 +135,19 @@ model {
   m ~ normal(0, 5);
   delta ~ double_exponential(0, tau);
   sigma_obs ~ normal(0, 0.5);
-  beta ~ normal(0, sigmas);
+  beta_unconst ~ normal(0, sigmas);
+  beta_neg_const ~ normal(0, sigmas);
+  beta_pos_const ~ normal(0, sigmas);
 
   // Likelihood
   y ~ normal(
   trend
-  .* (1 + X * (beta .* s_m))
-  + X * (beta .* s_a),
+  .* (1 + X * (beta_unconst .* s_m .* unconst))
+  .* (1 + X * (beta_neg_const .* s_m .* neg_const))
+  .* (1 + X * (beta_pos_const .* s_m .* pos_const))
+  + X * (beta_unconst .* s_a .* unconst)
+  + X * (beta_neg_const .* s_a .* neg_const)
+  + X * (beta_pos_const .* s_a .* pos_const),
   sigma_obs
   );
 }
