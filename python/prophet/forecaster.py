@@ -1124,14 +1124,15 @@ class Prophet(object):
 
         undesired_cols = ['multiplicative_terms','additive_terms','extra_regressors_multiplicative','extra_regressors_additive']
         regressors = self.train_component_cols.columns.drop(undesired_cols, errors='ignore')
-        positive_constrained = np.zeros(len(regressors))
-        negative_constrained = np.zeros(len(regressors))
-        unconstrained = np.zeros(len(regressors))
-        constant_zero_cols = np.zeros(len(regressors))
+
+        positive_constrained = np.zeros(len(self.train_component_cols))
+        negative_constrained = np.zeros(len(self.train_component_cols))
+        unconstrained = np.zeros(len(self.train_component_cols))
+        constant_zero_cols = np.zeros(len(self.train_component_cols))
 
         for c in regressors:
 
-            col_idx = (self.train_component_cols[c] == 1).idxmax()
+            col_idx = self.train_component_cols[self.train_component_cols[c] == 1].index
 
             if c in self.extra_regressors:
 
