@@ -10,7 +10,6 @@ import logging
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from datetime import timedelta, datetime
-from operator import pos
 
 import numpy as np
 import pandas as pd
