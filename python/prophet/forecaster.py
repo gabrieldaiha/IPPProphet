@@ -10,6 +10,7 @@ import logging
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from datetime import timedelta, datetime
+from operator import pos
 
 import numpy as np
 import pandas as pd
@@ -586,7 +587,7 @@ class Prophet(object):
         return holiday_features, prior_scale_list, holiday_names
 
     def add_regressor(self, name, prior_scale=None, standardize='auto',
-                      mode=None):
+                      constraint='unconstrained', mode=None):
         """Add an additional regressor to be used for fitting and predicting.
 
         The dataframe passed to `fit` and `predict` will have a column with the
@@ -608,6 +609,7 @@ class Prophet(object):
         standardize: optional, specify whether this regressor will be
             standardized prior to fitting. Can be 'auto' (standardize if not
             binary), True, or False.
+        constraint: optional. It can be 'positive', 'negative' or 'unconstrained'. Default 'unconstrained'.
         mode: optional, 'additive' or 'multiplicative'. Defaults to
             self.seasonality_mode.
 
@@ -630,6 +632,7 @@ class Prophet(object):
         self.extra_regressors[name] = {
             'prior_scale': prior_scale,
             'standardize': standardize,
+            'constraint': constraint,
             'mu': 0.,
             'std': 1.,
             'mode': mode,
@@ -1119,6 +1122,35 @@ class Prophet(object):
         seasonal_features, prior_scales, component_cols, modes = (
             self.make_all_seasonality_features(history))
         self.train_component_cols = component_cols
+
+        undesired_cols = ['multiplicative_terms','additive_terms','extra_regressors_multiplicative','extra_regressors_additive']
+        regressors = self.train_component_cols.columns.drop(undesired_cols, errors='ignore')
+        positive_constrained = np.zeros(len(regressors))
+        negative_constrained = np.zeros(len(regressors))
+        unconstrained = np.zeros(len(regressors))
+
+        for c in regressors:
+
+            col_idx = (self.train_component_cols[c] == 1).idxmax()
+
+            if c in self.extra_regressors:
+
+                if self.extra_regressors[c]['constraint'] == 'positive':
+                    positive_constrained[col_idx] = 1
+
+                if self.extra_regressors[c]['constraint'] == 'negative':
+                    negative_constrained[col_idx] = 1
+
+                if self.extra_regressors[c]['constraint'] == 'unconstrained':
+                    unconstrained[col_idx] = 1
+
+            else:
+                unconstrained[col_idx] = 1
+
+        self.constraints = {'pos_const':positive_constrained,
+                            'neg_const':negative_constrained,
+                            'unconst':unconstrained}
+
         self.component_modes = modes
         self.fit_kwargs = deepcopy(kwargs)
 
@@ -1139,6 +1171,9 @@ class Prophet(object):
             'trend_indicator': trend_indicator[self.growth],
             's_a': component_cols['additive_terms'],
             's_m': component_cols['multiplicative_terms'],
+            'pos_const': positive_constrained,
+            'neg_const': negative_constrained,
+            'unconst': unconstrained
         }
 
         if self.growth == 'linear':
@@ -1155,7 +1190,9 @@ class Prophet(object):
             'k': kinit[0],
             'm': kinit[1],
             'delta': np.zeros(len(self.changepoints_t)),
-            'beta': np.zeros(seasonal_features.shape[1]),
+            'beta_unconst': np.zeros(seasonal_features.shape[1]),
+            'beta_pos_const': np.zeros(seasonal_features.shape[1]) + 2,
+            'beta_neg_const': np.zeros(seasonal_features.shape[1]) - 2,
             'sigma_obs': 1,
         }
 
@@ -1178,6 +1215,11 @@ class Prophet(object):
                                 + self.params['delta'].reshape(-1))
             self.params['delta'] = (np.zeros(self.params['delta'].shape)
                                       .reshape((-1, 1)))
+
+        self.params['beta'] = self.params['beta_unconst'].copy() * 0
+
+        for const in self.constraints:
+            self.params['beta'] += self.params[f'beta_{const}'] * self.constraints[const]
 
         return self
 
