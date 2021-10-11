@@ -1127,12 +1127,16 @@ class Prophet(object):
         positive_constrained = np.zeros(len(regressors))
         negative_constrained = np.zeros(len(regressors))
         unconstrained = np.zeros(len(regressors))
+        constant_zero_cols = np.zeros(len(regressors))
 
         for c in regressors:
 
             col_idx = (self.train_component_cols[c] == 1).idxmax()
 
             if c in self.extra_regressors:
+
+                if (seasonal_features[c].min() == seasonal_features[c].max()) & (seasonal_features[c].min()==0):
+                    constant_zero_cols[col_idx] = 1
 
                 if self.extra_regressors[c]['constraint'] == 'positive':
                     positive_constrained[col_idx] = 1
@@ -1219,6 +1223,8 @@ class Prophet(object):
 
         for const in self.constraints:
             self.params['beta'] += self.params[f'beta_{const}'] * self.constraints[const]
+
+        self.params['beta'] *= (1-constant_zero_cols)
 
         return self
 
