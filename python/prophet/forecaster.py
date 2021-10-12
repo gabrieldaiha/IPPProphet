@@ -1151,7 +1151,7 @@ class Prophet(object):
             else:
                 unconstrained[col_idx] = 1
 
-        self.constraints = {'pos_const':positive_constrained,
+        constraints = {'pos_const':positive_constrained,
                             'neg_const':negative_constrained,
                             'unconst':unconstrained}
 
@@ -1222,8 +1222,8 @@ class Prophet(object):
 
         self.params['beta'] = self.params['beta_unconst'].copy() * 0
 
-        for const in self.constraints:
-            self.params['beta'] += self.params[f'beta_{const}'] * self.constraints[const]
+        for const in constraints:
+            self.params['beta'] += self.params[f'beta_{const}'] * constraints[const]
 
         self.params['beta'] *= (1-constant_zero_cols)
 
