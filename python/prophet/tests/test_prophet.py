@@ -107,7 +107,7 @@ class TestProphet(TestCase):
         N = DATA.shape[0]
         train = DATA.head(N // 2)
         future = DATA.tail(N // 2)
-        
+
         forecaster = Prophet(n_changepoints=0, mcmc_samples=100)
         forecaster.fit(train)
         forecaster.predict(future)
@@ -766,6 +766,7 @@ class TestProphet(TestCase):
                 'mu': 0,
                 'std': 1,
                 'standardize': 'auto',
+                'constraint':'unconstrained',
                 'mode': 'additive',
             },
         )
@@ -777,6 +778,8 @@ class TestProphet(TestCase):
             m.extra_regressors['numeric_feature']['std'], 147.368585, places=5)
         self.assertEqual(
             m.extra_regressors['numeric_feature2']['mode'], 'multiplicative')
+        self.assertEqual(
+            m.extra_regressors['numeric_feature2']['constraint'], 'unconstrained')
         self.assertEqual(
             m.extra_regressors['binary_feature2']['prior_scale'], 10.)
         self.assertAlmostEqual(
