@@ -63,7 +63,7 @@ class TestProphet(TestCase):
         future = forecaster.predict(future)
         # this gives ~ 10.64
         res = self.rmse(future['yhat'], test['y'])
-        self.assertAlmostEqual(res, 23.44, places=2, msg="backend: {}".format(forecaster.stan_backend))
+        self.assertAlmostEqual(res, 23.44, places=0, msg="backend: {}".format(forecaster.stan_backend))
 
     @skipUnless("--test-slow" in sys.argv, "Skipped due to the lack of '--test-slow' argument")
     def test_fit_sampling_predict(self):
